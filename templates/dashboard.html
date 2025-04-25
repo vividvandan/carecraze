@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CareCraze - Nutrition Dashboard</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      background: #f0f7f8;
+      color: #333;
+    }
+
+    .navbar {
+      background-color: #008080;
+      padding: 1rem 2rem;
+      color: white;
+      display: flex;
+      align-items: center;
+    }
+
+    .menu-toggle {
+      font-size: 24px;
+      cursor: pointer;
+      margin-right: 1rem;
+    }
+
+    .nav-title {
+      font-size: 1.5rem;
+      font-weight: 600;
+    }
+
+    .sidebar {
+      position: fixed;
+      top: 0;
+      left: -250px;
+      width: 250px;
+      height: 100%;
+      background-color: #004d4d;
+      color: white;
+      padding-top: 60px;
+      transition: left 0.3s ease-in-out;
+      z-index: 1001;
+    }
+
+    .sidebar a {
+      display: block;
+      padding: 15px 20px;
+      color: white;
+      text-decoration: none;
+      transition: background 0.3s;
+    }
+
+    .sidebar a:hover {
+      background-color: #006666;
+    }
+
+    h2 {
+      text-align: center;
+      margin-top: 30px;
+      color: #008080;
+      font-size: 2rem;
+    }
+
+    .dashboard {
+      display: flex;
+      justify-content: center;
+      align-items: stretch;
+      gap: 30px;
+      max-width: 1200px;
+      margin: 40px auto;
+      padding: 20px;
+      flex-wrap: wrap;
+    }
+
+    .chart-box, .progress-box {
+      flex: 1;
+      min-width: 400px;
+      height: 500px;
+      background: white;
+      padding: 30px;
+      border-radius: 12px;
+      box-shadow: 0 3px 6px rgba(0, 0, 0, 0.1);
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+    }
+
+    .progress-box .bar {
+      margin-bottom: 30px;
+    }
+
+    .progress-box .bar span {
+      display: block;
+      font-weight: bold;
+      margin-bottom: 6px;
+      font-size: 1rem;
+    }
+
+    .bar-bg {
+      height: 28px;
+      background: #ddd;
+      border-radius: 15px;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .bar-fill {
+      height: 100%;
+      width: 0;
+      border-radius: 15px;
+      transition: width 1s ease-in-out;
+    }
+
+    .bar-label {
+      position: absolute;
+      top: 4px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: white;
+      pointer-events: none;
+    }
+
+    .protein { background: #008080; }
+    .carbs   { background: #00cccc; }
+    .fats    { background: #ffaa00; }
+    .fiber   { background: #66cc99; }
+
+    .summary-text {
+      text-align: center;
+      margin-top: 20px;
+      font-size: 1rem;
+      font-weight: 500;
+      line-height: 1.6;
+    }
+
+    canvas {
+      max-width: 100%;
+      height: auto;
+    }
+
+    @media (max-width: 768px) {
+      .dashboard {
+        flex-direction: column;
+        align-items: center;
+      }
+      .chart-box, .progress-box {
+        width: 100%;
+        height: auto;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="navbar">
+    <div class="menu-toggle" onclick="toggleSidebar()">☰</div>
+    <div class="nav-title">CareCraze Dashboard</div>
+  </div>
+
+  <div class="sidebar" id="sidebar">
+    <a href="/">Home</a>
+    <a href="/meal_log">Meal Log</a>
+    <a href="/dashboard">Dashboard</a>
+    <a href="/logout">Logout</a>
+  </div>
+
+  <h2>Your Daily Nutrition Overview</h2>
+
+  <div class="dashboard">
+    <div class="chart-box">
+      <canvas id="nutritionPieChart"></canvas>
+    </div>
+
+    <div class="progress-box">
+      <div class="bar">
+        <span>Protein</span>
+        <div class="bar-bg">
+          <div class="bar-fill protein" id="protein-bar"></div>
+          <div class="bar-label" id="protein-label">0%</div>
+        </div>
+      </div>
+      <div class="bar">
+        <span>Carbs</span>
+        <div class="bar-bg">
+          <div class="bar-fill carbs" id="carbs-bar"></div>
+          <div class="bar-label" id="carbs-label">0%</div>
+        </div>
+      </div>
+      <div class="bar">
+        <span>Fats</span>
+        <div class="bar-bg">
+          <div class="bar-fill fats" id="fats-bar"></div>
+          <div class="bar-label" id="fats-label">0%</div>
+        </div>
+      </div>
+      <div class="bar">
+        <span>Fiber</span>
+        <div class="bar-bg">
+          <div class="bar-fill fiber" id="fiber-bar"></div>
+          <div class="bar-label" id="fiber-label">0%</div>
+        </div>
+      </div>
+
+      <div class="summary-text" id="requirementInfo"></div>
+    </div>
+  </div>
+
+  <script>
+    function toggleSidebar() {
+      const sidebar = document.getElementById("sidebar");
+      sidebar.style.left = sidebar.style.left === "0px" ? "-250px" : "0px";
+    }
+
+    async function fetchDashboardData() {
+      const res = await fetch("/api/dashboard_nutrition");
+      const data = await res.json();
+
+      const weight = data.weight || 60;
+      const current = data.total;
+
+      const ideal = {
+        protein: weight * 2,
+        carbs: weight * 3,
+        fats: weight * 1,
+        fiber: weight * 0.03
+      };
+
+      const percent = {
+        protein: Math.min((current.protein / ideal.protein) * 100, 100),
+        carbs: Math.min((current.carbs / ideal.carbs) * 100, 100),
+        fats: Math.min((current.fats / ideal.fats) * 100, 100),
+        fiber: Math.min((current.fiber / ideal.fiber) * 100, 100),
+      };
+
+      document.getElementById("protein-bar").style.width = percent.protein + "%";
+      document.getElementById("carbs-bar").style.width = percent.carbs + "%";
+      document.getElementById("fats-bar").style.width = percent.fats + "%";
+      document.getElementById("fiber-bar").style.width = percent.fiber + "%";
+
+      document.getElementById("protein-label").textContent = Math.round(percent.protein) + "%";
+      document.getElementById("carbs-label").textContent = Math.round(percent.carbs) + "%";
+      document.getElementById("fats-label").textContent = Math.round(percent.fats) + "%";
+      document.getElementById("fiber-label").textContent = Math.round(percent.fiber) + "%";
+
+      document.getElementById("requirementInfo").innerHTML = `
+        Protein: ${current.protein}/${ideal.protein}g<br>
+        Carbs: ${current.carbs}/${ideal.carbs}g<br>
+        Fats: ${current.fats}/${ideal.fats}g<br>
+        Fiber: ${current.fiber}/${ideal.fiber.toFixed(1)}g
+      `;
+
+      const ctx = document.getElementById('nutritionPieChart').getContext('2d');
+      new Chart(ctx, {
+        type: 'pie',
+        data: {
+          labels: ['Protein', 'Carbs', 'Fats', 'Fiber'],
+          datasets: [{
+            data: [current.protein, current.carbs, current.fats, current.fiber],
+            backgroundColor: ['#008080', '#00cccc', '#ffaa00', '#66cc99']
+          }]
+        },
+        options: {
+          plugins: {
+            tooltip: {
+              callbacks: {
+                label: function (context) {
+                  const label = context.label || '';
+                  const value = context.raw;
+                  return `${label}: ${value}g`;
+                }
+              }
+            }
+          }
+        }
+      });
+    }
+
+    document.addEventListener("DOMContentLoaded", fetchDashboardData);
+  </script>
+</body>
+</html>

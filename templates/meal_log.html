@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CareCraze - Nutrition Tracker</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      background: #f0f7f8;
+      color: #333;
+    }
+
+    .navbar {
+      background-color: #008080;
+      padding: 1rem 2rem;
+      color: white;
+      display: flex;
+      align-items: center;
+    }
+
+    .menu-toggle {
+      font-size: 24px;
+      cursor: pointer;
+      margin-right: 1rem;
+    }
+
+    .nav-title {
+      font-size: 1.5rem;
+      font-weight: 600;
+    }
+
+    .sidebar {
+      position: fixed;
+      top: 0;
+      left: -250px;
+      width: 250px;
+      height: 100%;
+      background-color: #004d4d;
+      color: white;
+      padding-top: 60px;
+      transition: left 0.3s ease-in-out;
+      z-index: 1001;
+    }
+
+    .sidebar a {
+      display: block;
+      padding: 15px 20px;
+      color: white;
+      text-decoration: none;
+      transition: background 0.3s;
+    }
+
+    .sidebar a:hover {
+      background-color: #006666;
+    }
+
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+      padding: 30px 20px;
+    }
+
+    h2 {
+      text-align: center;
+      color: #008080;
+      margin-bottom: 40px;
+    }
+
+    .meal-section {
+      background: white;
+      border-radius: 12px;
+      padding: 20px;
+      margin-bottom: 30px;
+      box-shadow: 0 3px 6px rgba(0, 0, 0, 0.1);
+    }
+
+    .meal-section h3 {
+      margin-bottom: 15px;
+      color: #005757;
+      font-size: 1.3rem;
+    }
+
+    .search-area {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-bottom: 15px;
+    }
+
+    .search-area input,
+    .search-area button {
+      padding: 10px;
+      border-radius: 8px;
+      border: 1px solid #ccc;
+    }
+
+    .search-area input[type="text"] {
+      flex: 2;
+    }
+
+    .search-area input[type="number"] {
+      flex: 1;
+    }
+
+    .search-area button {
+      background: #008080;
+      color: white;
+      border: none;
+      cursor: pointer;
+      transition: background 0.3s;
+    }
+
+    .search-area button:hover {
+      background: #006666;
+    }
+
+    .suggestions {
+      position: absolute;
+      background: white;
+      width: 100%;
+      border: 1px solid #ccc;
+      z-index: 10;
+      max-height: 150px;
+      overflow-y: auto;
+      border-radius: 0 0 8px 8px;
+    }
+
+    .suggestions div {
+      padding: 10px;
+      cursor: pointer;
+    }
+
+    .suggestions div:hover {
+      background-color: #f0f0f0;
+    }
+
+    .food-item {
+      border-bottom: 1px solid #eee;
+      padding: 8px 0;
+      font-size: 0.95rem;
+    }
+
+    .total {
+      margin-top: 10px;
+      font-weight: 600;
+    }
+
+    #overall-summary {
+      background: white;
+      border-radius: 12px;
+      padding: 20px;
+      box-shadow: 0 3px 8px rgba(0, 0, 0, 0.1);
+      margin-top: 40px;
+    }
+
+    #overall-summary h3 {
+      color: #005757;
+      margin-bottom: 15px;
+    }
+  </style>
+</head>
+<body>
+  <div class="navbar">
+    <div class="menu-toggle" onclick="toggleSidebar()">☰</div>
+    <div class="nav-title">CareCraze Nutrition Tracker</div>
+  </div>
+
+  <div class="sidebar" id="sidebar">
+    <a href="/">Home</a>
+    <a href="/meal_log">Meal Log</a>
+    <a href="/meal_history">Meal History</a>
+    <a href="/profile">Profile</a>
+  </div>
+
+  <div class="container">
+    <h2>Nutrition Tracker</h2>
+    <div id="meals"></div>
+
+    <div id="overall-summary">
+      <h3>Total Nutrition Summary</h3>
+      <p>Protein: <span id="total-protein">0</span> g</p>
+      <p>Carbs: <span id="total-carbs">0</span> g</p>
+      <p>Fats: <span id="total-fats">0</span> g</p>
+      <p>Fiber: <span id="total-fiber">0</span> g</p>
+    </div>
+  </div>
+
+  <script>
+    const meals = ["Breakfast", "Morning Snack", "Lunch", "Evening Snack", "Dinner"];
+    const totals = { protein: 0, carbs: 0, fats: 0, fiber: 0 };
+
+    function toggleSidebar() {
+      const sidebar = document.getElementById("sidebar");
+      sidebar.style.left = sidebar.style.left === "0px" ? "-250px" : "0px";
+    }
+
+    function renderMealSections() {
+      const container = document.getElementById("meals");
+      meals.forEach(meal => {
+        const id = meal.replace(/ /g, "");
+        container.innerHTML += `
+          <div class="meal-section" id="${id}">
+            <h3>${meal}</h3>
+            <div class="search-area">
+              <div style="position: relative; flex: 2;">
+                <input type="text" placeholder="Search food..." id="search-${meal}" oninput="showSuggestions('${meal}')" autocomplete="off" />
+                <div class="suggestions" id="suggestions-${meal}"></div>
+              </div>
+              <input type="number" placeholder="Qty" id="qty-${meal}" min="1" value="1" />
+              <button onclick="addFood('${meal}')">Add</button>
+            </div>
+            <div class="food-list" id="list-${meal}"></div>
+          </div>
+        `;
+      });
+    }
+
+    async function fetchAndRenderMeals() {
+      const res = await fetch("/get_today_meals");
+      const mealsData = await res.json();
+
+      mealsData.forEach(entry => {
+        const sectionId = `list-${entry.meal.replace(/ /g, "")}`;
+const section = document.getElementById(sectionId);
+        if (section) {
+          const itemHTML = `<div class="food-item">${entry.quantity} × ${entry.food} — P: ${entry.protein}g, C: ${entry.carbs}g, F: ${entry.fats}g, Fiber: ${entry.fiber}g</div>`;
+          section.innerHTML += itemHTML;
+        }
+
+        totals.protein += parseFloat(entry.protein);
+        totals.carbs += parseFloat(entry.carbs);
+        totals.fats += parseFloat(entry.fats);
+        totals.fiber += parseFloat(entry.fiber);
+      });
+
+      updateTotals();
+    }
+
+    async function addFood(meal) {
+      const input = document.getElementById(`search-${meal}`);
+      const qtyInput = document.getElementById(`qty-${meal}`);
+      const suggestionsBox = document.getElementById(`suggestions-${meal}`);
+      const query = input.value.trim().toLowerCase();
+      const quantity = parseFloat(qtyInput.value);
+      if (!query || quantity <= 0) return;
+
+      const res = await fetch(`/search_food?query=${query}`);
+      const data = await res.json();
+      const food = data.food;
+
+      const protein = (food.protein * quantity).toFixed(1);
+      const carbs = (food.carbs * quantity).toFixed(1);
+      const fats = (food.fats * quantity).toFixed(1);
+      const fiber = (food.fiber * quantity).toFixed(1);
+
+      const section = document.getElementById(`list-${meal}`);
+      const itemHTML = `<div class="food-item">${quantity} × ${food.name} — P: ${protein}g, C: ${carbs}g, F: ${fats}g, Fiber: ${fiber}g</div>`;
+      section.innerHTML += itemHTML;
+
+      totals.protein += parseFloat(protein);
+      totals.carbs += parseFloat(carbs);
+      totals.fats += parseFloat(fats);
+      totals.fiber += parseFloat(fiber);
+      updateTotals();
+
+      await fetch("/submit_meal", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ meal, food: food.name, quantity, protein, carbs, fats, fiber })
+      });
+
+      input.value = "";
+      qtyInput.value = 1;
+      suggestionsBox.innerHTML = "";
+    }
+
+    function updateTotals() {
+      document.getElementById("total-protein").textContent = totals.protein.toFixed(1);
+      document.getElementById("total-carbs").textContent = totals.carbs.toFixed(1);
+      document.getElementById("total-fats").textContent = totals.fats.toFixed(1);
+      document.getElementById("total-fiber").textContent = totals.fiber.toFixed(1);
+    }
+
+    async function showSuggestions(meal) {
+      const input = document.getElementById(`search-${meal}`);
+      const suggestionsBox = document.getElementById(`suggestions-${meal}`);
+      const query = input.value.toLowerCase();
+
+      if (!query) {
+        suggestionsBox.innerHTML = "";
+        return;
+      }
+
+      const res = await fetch(`/search_food?query=${query}`);
+      const data = await res.json();
+      const matches = data.matches || [];
+
+      suggestionsBox.innerHTML = "";
+      matches.forEach(match => {
+        const div = document.createElement("div");
+        div.textContent = match;
+        div.addEventListener("click", () => {
+          input.value = match;
+          suggestionsBox.innerHTML = "";
+        });
+        suggestionsBox.appendChild(div);
+      });
+    }
+
+    // === MAIN INIT ===
+    document.addEventListener("DOMContentLoaded", () => {
+      renderMealSections();     // First, render the structure
+      fetchAndRenderMeals();   // Then load the data from DB
+    });
+  </script>
+</body>
+</html>
